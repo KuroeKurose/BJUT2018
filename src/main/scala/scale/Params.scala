@@ -4,19 +4,36 @@ import chisel3._
 import chisel3.core.UInt
 import chisel3.util._
 
-trait CacheParams extends MemParams {
-  val capacity = 1 << 20 //1MB
-  val blockSize = 1 << 9 //64Byte
+trait Params {
+  val addrWidth = 32
+
+  val memSize = 1.GB
+
+  val cacheSize = 1.MB
+  val blockSize = 64 * bitsInByte
   val assoc = 8
-  val numSets = capacity / blockSize / assoc
+  val numSets = cacheSize / blockSize / assoc
 
   val offsetWidth = log2Ceil(blockSize)
   val setIndexWidth = log2Ceil(numSets)
   val tagWidth = addrWidth - offsetWidth - setIndexWidth
 
-  implicit class fromAddrToField(val addr:UInt){
+  def bitsInByte = 8
+
+  implicit class fromUIntToField(val addr: UInt) {
     def offset = addr(offsetWidth - 1, 0)
+
     def setIndex = addr(addrWidth - tagWidth - 1, offsetWidth)
+
     def tag = addr(addrWidth, addrWidth - tagWidth)
   }
+
+  implicit class fromUIntToUnit(val size: Int) {
+    def kB = size << 10
+
+    def MB = size << 20
+
+    def GB = size << 30
+  }
+
 }

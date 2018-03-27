@@ -3,7 +3,7 @@ package scale
 import chisel3._
 import chisel3.util._
 
-class Cache extends Module with CacheParams {
+class Cache extends Module with Params {
   val io = IO(new CacheIO)
 
   val blocks = Vec(numSets, Vec(assoc, new CacheBlock))

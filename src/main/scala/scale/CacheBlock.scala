@@ -3,7 +3,7 @@ package scale
 import chisel3._
 import chisel3.util._
 
-class CacheBlock extends Bundle with CacheParams {
+class CacheBlock extends Bundle with Params {
   val valid = Bool()
   val dirty = Bool()
   val tag = UInt(tagWidth.W)
