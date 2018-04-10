@@ -8,8 +8,8 @@ class Cache extends Module with Params {
 
   val ren = io.cpuReq.valid
   val ren_reg = RegNext(ren)
-  val blocks = Mem(numSets, VecInit(Seq.fill(assoc)(new CacheBlock)))
-  val counter_LFU = Mem(numSets, VecInit(Seq.fill(assoc)(0.U(4.W))))
+  val blocks = Mem(numSets, Vec(assoc, new CacheBlock))
+  val counter_LFU = Mem(numSets, Vec(assoc, UInt(4.W))) //todo init
 
   io.memReq.valid := false.B
   io.memReq.bits.read := false.B
@@ -38,8 +38,11 @@ class Cache extends Module with Params {
     io.cpuResp.bits.data := blockFound.data
 
   }.elsewhen(!hit && ren_reg) {
-    val topCountID = 0.U
-    val tempCount = 0.U
+    val topCountID = Wire(UInt())
+    val tempCount = Wire(UInt())
+
+    topCountID := 0.U
+    tempCount := 0.U
 
     for (n <- 0 until assoc - 1) {
       when(counter_LFU(setIndex)(n) > tempCount) {
@@ -48,12 +51,16 @@ class Cache extends Module with Params {
       }
       counter_LFU(setIndex)(n) := counter_LFU(setIndex)(n) + 1.U
     }
-    //todo:send read request to mem
+
     io.memReq.valid := true.B
     io.memReq.bits.read := true.B
     io.memReq.bits.addr := addr_reg
 
-    when(io.memResp.valid){    blocks(setIndex)(topCountID) := io.memResp.bits.data
+    when(io.memResp.valid) {
+      val oldval = blocks.read(setIndex)
+      val newval = oldval
+      newval(topCountID).data := io.memResp.bits.data
+      blocks.write(setIndex, newval)
     }
 
     counter_LFU(setIndex)(topCountID) := 0.U

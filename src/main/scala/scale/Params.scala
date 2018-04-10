@@ -25,7 +25,7 @@ trait Params {
 
     def setIndex = addr(addrWidth - tagWidth - 1, offsetWidth)
 
-    def tag = addr(addrWidth, addrWidth - tagWidth)
+    def tag = addr(addrWidth - 1, addrWidth - tagWidth)
   }
 
   implicit class fromUIntToUnit(val size: Int) {
