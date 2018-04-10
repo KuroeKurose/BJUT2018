@@ -11,13 +11,13 @@ class Cache extends Module with Params {
 
   val blocks = Mem(numSets, Vec(assoc, new CacheBlock))
 
-  //  io.memReq.valid := false.B
-  //  io.memReq.bits.read := false.B
-  //  io.memReq.bits.addr := DontCare
+  io.memResp.ready := false.B
+  io.memReq.valid := false.B
+  io.memReq.bits.read := false.B
+  io.memReq.bits.addr := DontCare
   io.cpuResp.valid := false.B
   io.cpuResp.bits := DontCare
-
-  io.cpuReq.ready := false.B
+  io.cpuReq.ready := true.B
 
 
   //  val counter_LFU = Mem(numSets, Vec(assoc, UInt(4.W))) //todo init
@@ -25,20 +25,20 @@ class Cache extends Module with Params {
   val counterLFU = Seq.fill(numSets)(Seq.fill(assoc)(new Counter(32)))
 
   when(io.cpuReq.valid) {
-    //  val addr_reg = WireInit(io.cpuReq.bits.addr)
-    val setIndex = io.cpuReq.bits.addr.setIndex //need change to reg?
-    val tag = io.cpuReq.bits.addr.tag
+    val addr_reg = RegInit(io.cpuReq.bits.addr)
+    val setIndex_reg = RegInit(io.cpuReq.bits.addr.setIndex) //need change to reg?
+    val tag_reg = RegInit(io.cpuReq.bits.addr.tag)
 
-    val set = blocks.read(setIndex)
+    val set = blocks.read(setIndex_reg)
 
-    val hit: Bool = set.exists((block: CacheBlock) => block.valid && block.tag === tag)
+    val hit: Bool = set.exists((block: CacheBlock) => block.valid && block.tag === tag_reg)
 
     when(hit) {
-      val blockFoundWay: UInt = set.indexWhere((block: CacheBlock) => block.valid && block.tag === tag)
+      val blockFoundWay: UInt = set.indexWhere((block: CacheBlock) => block.valid && block.tag === tag_reg)
       val blockFound = set(blockFoundWay)
 
       counterLFU.zipWithIndex.foreach { case (_, i) =>
-        when(i.U === setIndex) {
+        when(i.U === setIndex_reg) {
           counterLFU(i).zipWithIndex.foreach { case (_, j) =>
             when(j.U === blockFoundWay) {
               counterLFU(i)(j).value := 0.U
@@ -53,13 +53,13 @@ class Cache extends Module with Params {
       io.cpuResp.valid := true.B
       io.cpuResp.bits.data := blockFound.data
     }.otherwise {
-      val victimWay = WireInit(0.U)
+//      val victimWay = RegInit(0.U)
       counterLFU.zipWithIndex.foreach { case (_, i) =>
-        when(i.asUInt() === setIndex) {
+        when(i.asUInt() === setIndex_reg) {
           val tempCount = RegInit(0.U(4.W))
           counterLFU(i).zipWithIndex.foreach { case (_, j) =>
             when(counterLFU(i)(j).value > tempCount) {
-              victimWay := j.asUInt()
+//              victimWay := j.asUInt()
               tempCount := counterLFU(i)(j).value
             }.otherwise {
               counterLFU(i)(j).inc()
@@ -72,19 +72,24 @@ class Cache extends Module with Params {
           }
         }
       }
-
-//      val memData = new CacheBlock
-//      memData.valid := true.B
-//      memData.dirty := false.B
-//      memData.tag := 0.U
-//      memData.data := 0.U
+      when(io.memReq.ready) {
+        io.memReq.valid := true.B
+        io.memReq.bits.read := true.B
+        io.memReq.bits.addr := addr_reg
+        io.memResp.ready := true.B
+      }
+      when(io.memResp.valid) {
+        val oldval = blocks.read(setIndex_reg)
+        val newval = oldval
+        //todo victimWay
+//        newval(victimWay).valid := true.B
+//        newval(victimWay).dirty := false.B
+//        newval(victimWay).tag := tag_reg
+//        newval(victimWay).data := io.memResp.bits.data
+//        blocks.write(setIndex_reg, newval)
 //
-//      when(true.B) {
-//        val oldval = blocks.read(setIndex)
-//        val newval = oldval
-//        newval(victimWay) := memData
-//        blocks.write(setIndex, newval)
-//      }
+//        io.cpuResp.bits.data:= io.memResp.bits.data
+      }
     }
 
   }
@@ -116,9 +121,9 @@ class Cache extends Module with Params {
   //    }
   //
   //    val memData = new CacheBlock
-  ////    io.memReq.valid := true.B
-  ////    io.memReq.bits.read := true.B
-  ////    io.memReq.bits.addr := addr_reg
+  //    io.memReq.valid := true.B
+  //    io.memReq.bits.read := true.B
+  //    io.memReq.bits.addr := addr_reg
   //
   //    when(true.B) {
   //      val oldval = blocks.read(setIndex)
