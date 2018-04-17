@@ -39,6 +39,8 @@ class LFUExampleTester(example: LFUExample) extends PeekPokeTester(example) {
 
   poke(example.io.missReq.valid, true)
 
+  expect(example.io.missResp.bits, 1)
+
   step(1)
 }
 

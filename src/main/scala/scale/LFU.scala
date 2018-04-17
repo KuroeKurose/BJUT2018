@@ -27,7 +27,7 @@ class LFU(assoc: Int) extends CurrentCycle {
   }
 
   def miss() = {
-    var victimWay = assoc.U
+    var victimWay = (assoc - 1).U
     var maxCounterValue = 0.U(5.W)
 
     counters.zipWithIndex.foreach { case (counter, i) =>
