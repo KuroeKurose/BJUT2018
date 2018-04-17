@@ -4,6 +4,12 @@ import chisel3._
 import chisel3.iotesters.PeekPokeTester
 
 class CacheTester(cache: Cache) extends PeekPokeTester(cache) {
+  poke(cache.io.cpuReq.valid, false)
+
+  poke(cache.io.cpuResp.ready, false)
+
+  poke(cache.io.memResp.valid, false)
+
   while (peek(cache.io.cpuReq.ready) == BigInt(0)) {
     step(1)
   }
@@ -15,7 +21,7 @@ class CacheTester(cache: Cache) extends PeekPokeTester(cache) {
   poke(cache.io.cpuResp.ready, true)
 
   poke(cache.io.memResp.valid, true)
-  poke(cache.io.memResp.bits.data, 1)
+  poke(cache.io.memResp.bits.data, 2)
 
   step(1)
 }

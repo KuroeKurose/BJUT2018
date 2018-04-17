@@ -65,6 +65,8 @@ class Cache extends Module with Params with CurrentCycle {
       val way: UInt = blocks(setIndex).indexWhere((block: CacheBlock) => block.valid && block.tag === tag)
       val blockFound = blocks(setIndex)(way)
 
+      printf(p"[$currentCycle] cache.sets($setIndex)($way).hit: addr = $addr, tag = $tag, blockFound = $blockFound\n")
+
       lfus.zipWithIndex.foreach { case (lfu, i) =>
         when(i.U === setIndex) {
           lfu.hit(way)
@@ -77,20 +79,22 @@ class Cache extends Module with Params with CurrentCycle {
       lfus.zipWithIndex.foreach { case (lfu, i) =>
         when(i.U === setIndex) {
           val victimWay = lfu.miss()
-          val blockFound = WireInit(blocks(setIndex)(victimWay))
+          val victimBlock = Wire(new CacheBlock)
+
+          printf(p"[$currentCycle] cache.sets($setIndex)($victimWay).miss: addr = $addr, tag = $tag, victimBlock = $victimBlock\n")
 
           io.memReq.valid := true.B
           io.memReq.bits.read := true.B
           io.memReq.bits.addr := addr
 
-          blockFound.valid := true.B
-          blockFound.tag := tag
-          blockFound.data := io.memResp.bits.data
+          victimBlock.valid := true.B
+          victimBlock.tag := tag
+          victimBlock.data := io.memResp.bits.data
 
-          blocks(setIndex)(victimWay) := blockFound
+          blocks(setIndex)(victimWay) := victimBlock
 
           io.cpuResp.valid := true.B
-          io.cpuResp.bits.data := blockFound.data
+          io.cpuResp.bits.data := victimBlock.data
         }
       }
     }
