@@ -17,8 +17,6 @@ class Cache extends Module with Params {
   io.memReq.bits.read := false.B
   io.memReq.bits.addr := DontCare
 
-  io.memResp.ready := false.B
-
   val lfus = Seq.fill(numSets)(new LFU(assoc))
 
   when(io.cpuReq.valid) {
@@ -26,17 +24,17 @@ class Cache extends Module with Params {
     val setIndex = RegInit(io.cpuReq.bits.addr.setIndex)
     val tag = RegInit(io.cpuReq.bits.addr.tag)
 
-    val set = blocks.read(setIndex)
+    val set = blocks(setIndex)
 
     val hit: Bool = set.exists((block: CacheBlock) => block.valid && block.tag === tag)
 
     when(hit) {
-      val blockFoundWay: UInt = set.indexWhere((block: CacheBlock) => block.valid && block.tag === tag)
-      val blockFound = set(blockFoundWay)
+      val way: UInt = set.indexWhere((block: CacheBlock) => block.valid && block.tag === tag)
+      val blockFound = set(way)
 
       lfus.zipWithIndex.foreach { case (lfu, i) =>
         when(i.U === setIndex) {
-          lfu.hit(blockFoundWay)
+          lfu.hit(way)
         }
       }
 
@@ -46,19 +44,17 @@ class Cache extends Module with Params {
       lfus.zipWithIndex.foreach { case (lfu, i) =>
         when(i.U === setIndex) {
           val victimWay = lfu.miss()
+          val blockFound = set(victimWay)
+
+          io.memReq.valid := true.B
+          io.memReq.bits.read := true.B
+          io.memReq.bits.addr := addr
+
+          set(victimWay) := io.memResp.bits.data
+
+          io.cpuResp.valid := true.B
+          io.cpuResp.bits.data := blockFound.data
         }
-      }
-
-      when(io.memReq.ready) {
-        io.memReq.valid := true.B
-        io.memReq.bits.read := true.B
-        io.memReq.bits.addr := addr
-        io.memResp.ready := true.B
-      }
-
-      when(io.memResp.valid) {
-        val oldval = blocks.read(setIndex)
-        val newval = oldval
       }
     }
   }

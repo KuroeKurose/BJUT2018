@@ -6,16 +6,12 @@ import chisel3.util._
 class Mem extends Module with Params {
   val io = IO(new MemIO)
 
-  val addr_reg = RegInit(io.cacheReq.bits.addr)
-  val resp_reg = Reg(UInt(blockSize.W))
   val blocks = Mem(memSize, UInt(blockSize.W))
 
-  io.cacheResp.valid := false.B
+  io.resp.valid := io.req.valid && io.req.bits.read
+  io.resp.bits.data := blocks(io.req.bits.addr)
 
-  when(io.cacheReq.valid && io.cacheReq.bits.read) {
-    resp_reg := blocks(addr_reg)
-    io.cacheResp.valid := true.B
+  when(io.req.valid && !io.req.bits.read) {
+    blocks(io.req.bits.addr) := io.req.bits.data
   }
-
-  io.cacheResp.bits.data := resp_reg
 }
