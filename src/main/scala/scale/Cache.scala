@@ -3,12 +3,18 @@ package scale
 import chisel3._
 import chisel3.util._
 
-class Cache extends Module with Params {
+class Cache extends Module with Params with CurrentCycle {
   val io = IO(new CacheIO)
+
+  val sIdle :: sInitBusy :: sInitDone :: Nil = Enum(3)
+
+  val state = RegInit(sIdle)
+
+  val initSetCounter = new Counter(numSets)
 
   val blocks = Mem(numSets, Vec(assoc, new CacheBlock))
 
-  io.cpuReq.ready := true.B
+  io.cpuReq.ready := state === sInitDone
 
   io.cpuResp.valid := false.B
   io.cpuResp.bits := DontCare
@@ -18,6 +24,35 @@ class Cache extends Module with Params {
   io.memReq.bits.addr := DontCare
 
   val lfus = Seq.tabulate(numSets)(setIndex => new LFU(setIndex, assoc))
+
+  def init(setIndex: UInt): Unit = {
+    val set = Wire(Vec(assoc, new CacheBlock))
+
+    (0 until assoc).foreach { i =>
+      set(i).valid := 0.U
+      set(i).tag := 0.U
+      set(i).data := 0.U
+    }
+
+    blocks(setIndex) := set
+
+    printf(p"[$currentCycle] cache.sets($setIndex).init\n")
+  }
+
+  switch(state) {
+    is(sIdle) {
+      init(initSetCounter.value)
+
+      state := sInitBusy
+    }
+    is(sInitBusy) {
+      init(initSetCounter.value)
+
+      when(initSetCounter.inc()) {
+        state := sInitDone
+      }
+    }
+  }
 
   when(io.cpuReq.valid) {
     val addr = io.cpuReq.bits.addr
