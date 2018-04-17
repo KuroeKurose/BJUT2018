@@ -6,7 +6,7 @@ import chisel3.util._
 class LFU(assoc: Int) extends CurrentCycle {
   private val counters = Seq.fill(assoc)(new Counter(32))
 
-  def access(way: UInt) = {
+  private def access(way: UInt) = {
     counters.zipWithIndex.foreach { case (counter, i) =>
       when(i.U === way) {
         counter.value := 0.U
