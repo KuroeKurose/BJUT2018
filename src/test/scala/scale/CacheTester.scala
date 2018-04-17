@@ -9,8 +9,6 @@ class CacheTester(cache: Cache) extends PeekPokeTester(cache) {
   poke(cache.io.cpuReq.bits.addr, 12345)
   poke(cache.io.cpuResp.ready, true)
 
-  poke(cache.io.memReq.ready, true)
-
   poke(cache.io.memResp.valid, true)
   poke(cache.io.memResp.bits.data, 1111)
 }

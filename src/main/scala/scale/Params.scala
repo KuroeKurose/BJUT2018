@@ -7,9 +7,9 @@ import chisel3.util._
 trait Params {
   val addrWidth = 32
 
-  val memSize = 1.GB
+  val memSize = 8.MB
 
-  val cacheSize = 1.MB
+  val cacheSize = 64.kB
   val blockSize = 64 * bitsInByte
   val assoc = 8
   val numSets = cacheSize / blockSize / assoc
