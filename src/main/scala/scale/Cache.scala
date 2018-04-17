@@ -17,20 +17,18 @@ class Cache extends Module with Params {
   io.memReq.bits.read := false.B
   io.memReq.bits.addr := DontCare
 
-  val lfus = Seq.fill(numSets)(new LFU(assoc))
+  val lfus = Seq.tabulate(numSets)(setIndex => new LFU(setIndex, assoc))
 
   when(io.cpuReq.valid) {
-    val addr = RegInit(io.cpuReq.bits.addr)
-    val setIndex = RegInit(io.cpuReq.bits.addr.setIndex)
-    val tag = RegInit(io.cpuReq.bits.addr.tag)
+    val addr = io.cpuReq.bits.addr
+    val setIndex = io.cpuReq.bits.addr.setIndex
+    val tag = io.cpuReq.bits.addr.tag
 
-    val set = blocks(setIndex)
-
-    val hit: Bool = set.exists((block: CacheBlock) => block.valid && block.tag === tag)
+    val hit: Bool = blocks(setIndex).exists((block: CacheBlock) => block.valid && block.tag === tag)
 
     when(hit) {
-      val way: UInt = set.indexWhere((block: CacheBlock) => block.valid && block.tag === tag)
-      val blockFound = set(way)
+      val way: UInt = blocks(setIndex).indexWhere((block: CacheBlock) => block.valid && block.tag === tag)
+      val blockFound = blocks(setIndex)(way)
 
       lfus.zipWithIndex.foreach { case (lfu, i) =>
         when(i.U === setIndex) {
@@ -44,13 +42,17 @@ class Cache extends Module with Params {
       lfus.zipWithIndex.foreach { case (lfu, i) =>
         when(i.U === setIndex) {
           val victimWay = lfu.miss()
-          val blockFound = set(victimWay)
+          val blockFound = WireInit(blocks(setIndex)(victimWay))
 
           io.memReq.valid := true.B
           io.memReq.bits.read := true.B
           io.memReq.bits.addr := addr
 
-          set(victimWay) := io.memResp.bits.data
+          blockFound.valid := true.B
+          blockFound.tag := tag
+          blockFound.data := io.memResp.bits.data
+
+          blocks(setIndex)(victimWay) := blockFound
 
           io.cpuResp.valid := true.B
           io.cpuResp.bits.data := blockFound.data

@@ -10,10 +10,10 @@ class LFUExampleIO(assoc: Int) extends Bundle {
   val missResp = Valid(UInt(log2Ceil(assoc).W))
 }
 
-class LFUExample(assoc: Int) extends Module {
+class LFUExample(setIndex: Int, assoc: Int) extends Module {
   val io = IO(new LFUExampleIO(assoc))
 
-  val lfu = new LFU(assoc)
+  val lfu = new LFU(setIndex, assoc)
 
   io.missResp.valid := false.B
   io.missResp.bits := DontCare
@@ -45,7 +45,8 @@ class LFUExampleTester(example: LFUExample) extends PeekPokeTester(example) {
 }
 
 object LFUExampleTester extends App {
+  private val setIndex = 0
   private val assoc = 8
 
-  chisel3.iotesters.Driver(() => new LFUExample(assoc)) { example => new LFUExampleTester(example) }
+  chisel3.iotesters.Driver(() => new LFUExample(setIndex, assoc)) { example => new LFUExampleTester(example) }
 }

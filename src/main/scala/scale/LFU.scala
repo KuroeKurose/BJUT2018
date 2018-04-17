@@ -3,7 +3,7 @@ package scale
 import chisel3._
 import chisel3.util._
 
-class LFU(assoc: Int) extends CurrentCycle {
+class LFU(setIndex: Int, assoc: Int) extends CurrentCycle {
   private val counters = Seq.fill(assoc)(new Counter(32))
 
   private def access(way: UInt) = {
@@ -16,12 +16,12 @@ class LFU(assoc: Int) extends CurrentCycle {
     }
 
     counters.zipWithIndex.foreach { case (counter, i) =>
-      printf(p"[$currentCycle] LFU.access: i = $i, way = $way, (i.U === way) = ${i.U === way}, counter.value = ${counter.value}\n")
+      printf(p"[$currentCycle] cache.sets($setIndex).lfu.access: i = $i, way = $way, (i.U === way) = ${i.U === way}, counter.value = ${counter.value}\n")
     }
   }
 
   def hit(way: UInt) = {
-    printf(p"[$currentCycle] LFU.hit: way = $way\n")
+    printf(p"[$currentCycle] cache.sets($setIndex).lfu.hit: way = $way\n")
 
     access(way)
   }
@@ -37,7 +37,7 @@ class LFU(assoc: Int) extends CurrentCycle {
 
     assert(victimWay < assoc.U)
 
-    printf(p"[$currentCycle] LFU.miss: victimWay = $victimWay\n")
+    printf(p"[$currentCycle] cache.sets($setIndex).lfu.miss: victimWay = $victimWay\n")
 
     access(victimWay)
 
