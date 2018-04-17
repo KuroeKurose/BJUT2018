@@ -14,7 +14,7 @@ class Cache extends Module with Params with CurrentCycle {
 
   val blocks = Mem(numSets, Vec(assoc, new CacheBlock))
 
-  io.cpuReq.ready := state === sInitDone
+  io.cpuReq.ready := false.B
 
   io.cpuResp.valid := false.B
   io.cpuResp.bits := DontCare
@@ -29,7 +29,7 @@ class Cache extends Module with Params with CurrentCycle {
     val set = Wire(Vec(assoc, new CacheBlock))
 
     (0 until assoc).foreach { i =>
-      set(i).valid := 0.U
+      set(i).valid := false.B
       set(i).tag := 0.U
       set(i).data := 0.U
     }
@@ -54,7 +54,9 @@ class Cache extends Module with Params with CurrentCycle {
     }
   }
 
-  when(io.cpuReq.valid) {
+  when(state === sInitDone && io.cpuReq.valid && io.cpuResp.ready) {
+    io.cpuReq.ready := true.B
+
     val addr = io.cpuReq.bits.addr
     val setIndex = io.cpuReq.bits.addr.setIndex
     val tag = io.cpuReq.bits.addr.tag
