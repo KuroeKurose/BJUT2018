@@ -1,5 +1,6 @@
 .idea/
 test_run_dir/
 target/
+source/
 *.class
 *.log

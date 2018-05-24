@@ -14,8 +14,8 @@ class Mem extends Module with Params with CurrentCycle {
 
   val blocks = Mem(memSize, UInt(blockSize.W))
 
-  io.resp.valid := false.B
-  io.resp.bits.data := DontCare
+  io.cacheResp.valid := false.B
+  io.cacheResp.bits.data := DontCare
 
   def init(index: UInt): Unit = {
     val memBlock = Wire(UInt(blockSize.W))
@@ -42,23 +42,15 @@ class Mem extends Module with Params with CurrentCycle {
   }
 
 
-  when(state === sInitDone && io.req.valid && !io.req.bits.read) {
-    io.resp.valid := true.B
-    blocks(io.req.bits.addr) := io.req.bits.data
-    printf(p"[$currentCycle] Mem.write: addr = ${io.req.bits.addr}, data = ${io.req.bits.data}\n")
+  when(state === sInitDone && io.cacheReq.valid && !io.cacheReq.bits.read) {
+    io.cacheResp.valid := true.B
+    blocks(io.cacheReq.bits.addr) := io.cacheReq.bits.data
+    printf(p"[$currentCycle] Mem.write: addr = ${io.cacheReq.bits.addr}, data = ${io.cacheReq.bits.data}\n")
 
-  }.elsewhen(state === sInitDone && io.req.valid && io.req.bits.read) {
-    io.resp.valid := true.B
-    io.resp.bits.data := blocks(io.req.bits.addr)
-    printf(p"[$currentCycle] Mem.read: addr = ${io.req.bits.addr}, data = ${io.resp.bits.data}\n")
+  }.elsewhen(state === sInitDone && io.cacheReq.valid && io.cacheReq.bits.read) {
+    io.cacheResp.valid := true.B
+    io.cacheResp.bits.data := blocks(io.cacheReq.bits.addr)
+    printf(p"[$currentCycle] Mem.read: addr = ${io.cacheReq.bits.addr}, data = ${io.cacheResp.bits.data}\n")
 
   }
-
-  //  when(io.req.valid){
-  //    when(io.req.bits.read){
-  //      printf(p"[$currentCycle] Mem.read: addr = ${io.req.bits.addr}, data = ${io.resp.bits.data}\n")
-  //    }.otherwise{
-  //      printf(p"[$currentCycle] Mem.write: addr = ${io.req.bits.addr}, data = ${io.req.bits.data}\n")
-  //    }
-  //  }
 }
