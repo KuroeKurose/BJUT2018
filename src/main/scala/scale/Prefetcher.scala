@@ -15,8 +15,8 @@ class Prefetcher extends Module with Params with CurrentCycle {
   io.cacheReq.bits.addr := DontCare
   io.cacheReq.bits.data := DontCare
 
-  when(io.cpuReqMonitor.valid) {
-    val addr = io.cpuReqMonitor.bits.addr
+  when(io.cpuReq.valid) {
+    val addr = io.cpuReq.bits.addr
     addr := addr + addrWidth.U
 
     io.memReq.valid := true.B

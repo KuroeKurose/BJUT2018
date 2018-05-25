@@ -4,7 +4,7 @@ import chisel3._
 import chisel3.util._
 
 class PrefetcherIO extends Bundle {
-  val cpuReqMonitor = Flipped(Decoupled(new CacheRequest))
+  val cpuReq = Flipped(Decoupled(new CacheRequest))
 
   val cacheReq = Decoupled(new CacheRequest)
 
