@@ -20,8 +20,7 @@ class Cache extends Module with Params with CurrentCycle {
   io.cpuResp.bits := DontCare
 
   io.memReq.valid := false.B
-  io.memReq.bits.read := false.B
-  io.memReq.bits.addr := DontCare
+  io.memReq.bits := DontCare
 
   val lfus = Seq.tabulate(numSets)(setIndex => new LFU(setIndex, assoc))
 
