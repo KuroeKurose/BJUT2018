@@ -14,7 +14,12 @@ class Cache extends Module with Params with CurrentCycle {
 
   val blocks = Mem(numSets, Vec(assoc, new CacheBlock))
 
-  io.cpuReq.ready := false.B
+
+  val readHits = new Counter(Int.MaxValue)
+  val writeHits = new Counter(Int.MaxValue)
+  val readMisses = new Counter(Int.MaxValue)
+  val writeMisses = new Counter(Int.MaxValue)
+  val replacements = new Counter(Int.MaxValue)
 
   io.cpuResp.valid := false.B
   io.cpuResp.bits := DontCare
@@ -35,7 +40,7 @@ class Cache extends Module with Params with CurrentCycle {
 
     blocks(setIndex) := set
 
-//    printf(p"[$currentCycle] cache.sets($setIndex).init\n")
+    //    printf(p"[$currentCycle] cache.sets($setIndex).init\n")
   }
 
   switch(state) {
@@ -54,14 +59,21 @@ class Cache extends Module with Params with CurrentCycle {
     }
   }
 
-  val addr = io.cpuReq.bits.addr
-  val setIndex = io.cpuReq.bits.addr.setIndex
-  val tag = io.cpuReq.bits.addr.tag
+  val addr = RegNext(io.cpuReq.bits.addr)
+  val setIndex = RegNext(io.cpuReq.bits.addr.setIndex)
+  val tag = RegNext(io.cpuReq.bits.addr.tag)
 
-  when(state === sInitDone && io.cpuReq.valid && io.cpuResp.ready) {
-    io.cpuReq.ready := true.B
+  io.readHits := readHits.value
+  io.readMisses := readMisses.value
+  io.writeHits := writeHits.value
+  io.writeMisses := writeMisses.value
+  io.replacements := replacements.value
 
+
+  when(state === sInitDone && io.cpuReq.valid) {
+    io.cpuResp.valid := true.B
     val hit: Bool = blocks(setIndex).exists((block: CacheBlock) => block.valid && block.tag === tag)
+
 
     when(hit) {
       val way: UInt = blocks(setIndex).indexWhere((block: CacheBlock) => block.valid && block.tag === tag)
@@ -71,13 +83,12 @@ class Cache extends Module with Params with CurrentCycle {
           lfu.hit(way)
         }
       }
-
       when(io.cpuReq.bits.read) {
         val blockFound = blocks(setIndex)(way)
 
-        printf(p"[$currentCycle] cache.sets($setIndex)($way).read hit: addr = $addr, tag = $tag, blockFound = $blockFound\n")
+        readHits.inc()
+        printf(p"[$currentCycle] cache.sets($setIndex)($way).read hit: addr = 0x${Hexadecimal(addr)}, tag = 0x${Hexadecimal(tag)}, blockFound = 0x${Hexadecimal(blockFound.data)}\n")
 
-        io.cpuResp.valid := true.B
         io.cpuResp.bits.data := blockFound.data
       }.otherwise {
         val newBlock = Wire(new CacheBlock)
@@ -85,14 +96,13 @@ class Cache extends Module with Params with CurrentCycle {
         newBlock.tag := tag
         newBlock.data := io.cpuReq.bits.data
 
-        printf(p"[$currentCycle] cache.sets($setIndex)($way).write: addr = $addr, tag = $tag, newBlock = $newBlock\n")
+        writeHits.inc()
+        printf(p"[$currentCycle] cache.sets($setIndex)($way).write hit: addr = 0x${Hexadecimal(addr)}, tag = 0x${Hexadecimal(tag)}, newBlock = 0x${Hexadecimal(newBlock.data)}\n")
 
         blocks(setIndex)(way) := newBlock
-        io.cpuResp.valid := true.B
       }
-
-    }.otherwise {    //when miss
-      when(io.cpuReq.bits.read) {
+    }.otherwise { //when miss
+      when(io.cpuReq.bits.read && io.memResp.valid) {
         lfus.zipWithIndex.foreach { case (lfu, i) =>
           when(i.U === setIndex) {
             val victimWay = lfu.miss()
@@ -101,25 +111,32 @@ class Cache extends Module with Params with CurrentCycle {
             io.memReq.bits.read := true.B
             io.memReq.bits.addr := addr
 
-            val victimBlock = Wire(new CacheBlock)
-            victimBlock.valid := true.B
-            victimBlock.tag := tag
-            victimBlock.data := io.memResp.bits.data
+            val victimBlock = blocks(setIndex)(victimWay)
+            when(victimBlock.valid) {
+              replacements.inc()
+            }
 
-            printf(p"[$currentCycle] cache.sets($setIndex)($victimWay).read miss: addr = $addr, tag = $tag, victimBlock = $victimBlock\n")
+            val newBlock = Wire(new CacheBlock)
+            newBlock.valid := true.B
+            newBlock.tag := tag
+            newBlock.data := io.memResp.bits.data
 
-            blocks(setIndex)(victimWay) := victimBlock
+            readMisses.inc()
+            printf(p"[$currentCycle] cache.sets($setIndex)($victimWay).read miss: addr = 0x${Hexadecimal(addr)}, tag = 0x${Hexadecimal(tag)}, victimBlock = 0x${Hexadecimal(victimBlock.data)}, newBlock = 0x${Hexadecimal(newBlock.data)}\n")
 
-            io.cpuResp.valid := true.B
-            io.cpuResp.bits.data := victimBlock.data
+            blocks(setIndex)(victimWay) := newBlock
+
+            io.cpuResp.bits.data := newBlock.data
           }
         }
-      }.otherwise {
+      }.elsewhen(!io.cpuReq.bits.read) {
         lfus.zipWithIndex.foreach { case (lfu, i) =>
           when(i.U === setIndex) {
             val victimWay = lfu.miss()
             val victimBlock = blocks(setIndex)(victimWay)
-
+            when(victimBlock.valid) {
+              replacements.inc()
+            }
             io.memReq.valid := true.B
             io.memReq.bits.read := false.B
             io.memReq.bits.addr := Cat(tag + setIndex + 0.U(offsetWidth.W))
@@ -130,16 +147,15 @@ class Cache extends Module with Params with CurrentCycle {
             newBlock.tag := tag
             newBlock.data := io.cpuReq.bits.data
 
-            printf(p"[$currentCycle] cache.sets($setIndex)($victimWay).write: addr = $addr, tag = $tag, victimBlock = $victimBlock, newBlock = $newBlock\n")
+            writeMisses.inc()
+            printf(p"[$currentCycle] cache.sets($setIndex)($victimWay).write miss: addr = 0x${Hexadecimal(addr)}, tag = 0x${Hexadecimal(tag)}, victimBlock = 0x${Hexadecimal(victimBlock.data)}, newBlock = 0x${Hexadecimal(newBlock.data)}\n")
 
 
             blocks(setIndex)(victimWay) := newBlock
 
-            io.cpuResp.valid := true.B
           }
         }
       }
-
     }
   }
 }
