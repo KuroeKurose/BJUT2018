@@ -35,7 +35,7 @@ class Cache extends Module with Params with CurrentCycle {
 
     blocks(setIndex) := set
 
-    printf(p"[$currentCycle] cache.sets($setIndex).init\n")
+//    printf(p"[$currentCycle] cache.sets($setIndex).init\n")
   }
 
   switch(state) {
@@ -49,16 +49,17 @@ class Cache extends Module with Params with CurrentCycle {
 
       when(initSetCounter.inc()) {
         state := sInitDone
+        printf(p"[$currentCycle] cache.init done.\n")
       }
     }
   }
 
-  when(state === sInitDone && io.cpuReq.valid && io.cpuResp.ready && io.cpuReq.bits.read) {
-    io.cpuReq.ready := true.B
+  val addr = io.cpuReq.bits.addr
+  val setIndex = io.cpuReq.bits.addr.setIndex
+  val tag = io.cpuReq.bits.addr.tag
 
-    val addr = io.cpuReq.bits.addr
-    val setIndex = io.cpuReq.bits.addr.setIndex
-    val tag = io.cpuReq.bits.addr.tag
+  when(state === sInitDone && io.cpuReq.valid && io.cpuResp.ready) {
+    io.cpuReq.ready := true.B
 
     val hit: Bool = blocks(setIndex).exists((block: CacheBlock) => block.valid && block.tag === tag)
 
@@ -90,7 +91,7 @@ class Cache extends Module with Params with CurrentCycle {
         io.cpuResp.valid := true.B
       }
 
-    }.otherwise {
+    }.otherwise {    //when miss
       when(io.cpuReq.bits.read) {
         lfus.zipWithIndex.foreach { case (lfu, i) =>
           when(i.U === setIndex) {
