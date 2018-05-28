@@ -3,8 +3,8 @@ package scale
 import chisel3._
 import chisel3.util._
 
-class Prefetcher extends Module with Params with CurrentCycle {
-  val io = IO(new PrefetcherIO)
+class NextLinePrefetcher extends Module with Params with CurrentCycle {
+  val io = IO(new NextLinePrefetcherIO)
   //
   //  io.memReq.valid := false.B
   //  io.memReq.bits.read := false.B
@@ -36,11 +36,18 @@ class Prefetcher extends Module with Params with CurrentCycle {
   //    }
   //  }
 
-  io.request.ready := false.B
 
+  io.response.valid := false.B
+  io.response.bits.addr := 0.U
+
+  when(io.request.valid) {
+    io.response.valid := true.B
+    io.response.bits.addr := io.request.bits.addr + addrWidth.U
+    printf(p"[$currentCycle] response addr = ${io.response.bits.addr}\n")
+  }
 
 }
 
-object Prefetcher extends App {
-  Driver.execute(Array("-td", "source/"), () => new Prefetcher)
+object NextLinePrefetcher extends App {
+  Driver.execute(Array("-td", "source/"), () => new NextLinePrefetcher)
 }
