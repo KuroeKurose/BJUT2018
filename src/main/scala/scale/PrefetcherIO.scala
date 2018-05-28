@@ -3,12 +3,14 @@ package scale
 import chisel3._
 import chisel3.util._
 
+class PrefetcherRequest extends Bundle with Params {
+  val read = Bool()
+  val hit = Bool()
+  val addr = UInt(addrWidth.W)
+}
+
+
+
 class PrefetcherIO extends Bundle {
-  val cpuReq = Flipped(Decoupled(new CacheRequest))
-
-  val cacheReq = Decoupled(new CacheRequest)
-
-  val memReq = Valid(new CacheRequest)
-  val memResp = Flipped(Valid(new CacheResponse))
-
+  val request = Flipped(Decoupled(new PrefetcherRequest))
 }
