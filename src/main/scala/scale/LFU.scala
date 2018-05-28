@@ -4,42 +4,46 @@ import chisel3._
 import chisel3.util._
 
 class LFU(setIndex: Int, assoc: Int) extends CurrentCycle {
-  private val counters = Seq.fill(assoc)(new Counter(32))
+  val maxCounterValue = 32
 
-  private def access(way: UInt) = {
+  private val counters = Seq.fill(assoc)(new Counter(maxCounterValue))
+
+
+  def hit(way: UInt) = {
+    printf(p"[$currentCycle] cache.sets($setIndex).lfu.hit: way = $way\n")
+
     counters.zipWithIndex.foreach { case (counter, i) =>
+      var hitValue = 0.U
       when(i.U === way) {
+        hitValue = counter.value
+      }
+      counter.value := Mux(counter.value <= hitValue, counter.value + 1.U, counter.value)
+      when(i.U === way) {
+        counter.value := 0.U
+      }
+    }
+  }
+
+  def miss() = {
+    var victimWay = assoc.U
+    var victimCounterValue = 0.U(log2Ceil(maxCounterValue).W)
+
+    counters.zipWithIndex.foreach { case (counter, i) =>
+      victimWay = Mux(counter.value > victimCounterValue, i.U, victimWay)
+      victimCounterValue = Mux(counter.value > victimCounterValue, counter.value, victimCounterValue)
+    }
+
+    assert(victimWay < assoc.U)
+
+    counters.zipWithIndex.foreach { case (counter, i) =>
+      when(i.U === victimWay) {
         counter.value := 0.U
       }.otherwise {
         counter.inc()
       }
     }
 
-    counters.zipWithIndex.foreach { case (counter, i) =>
-      printf(p"[$currentCycle] cache.sets($setIndex).lfu.access: i = $i, way = $way, (i.U === way) = ${i.U === way}, counter.value = ${counter.value}\n")
-    }
-  }
-
-  def hit(way: UInt) = {
-    printf(p"[$currentCycle] cache.sets($setIndex).lfu.hit: way = $way\n")
-
-    access(way)
-  }
-
-  def miss() = {
-    var victimWay = (assoc - 1).U
-    var maxCounterValue = 0.U(5.W)
-
-    counters.zipWithIndex.foreach { case (counter, i) =>
-      victimWay = Mux(counter.value > maxCounterValue, i.U, victimWay)
-      maxCounterValue = Mux(counter.value > maxCounterValue, counter.value, maxCounterValue)
-    }
-
-    assert(victimWay < assoc.U)
-
     printf(p"[$currentCycle] cache.sets($setIndex).lfu.miss: victimWay = $victimWay\n")
-
-    access(victimWay)
 
     victimWay
   }

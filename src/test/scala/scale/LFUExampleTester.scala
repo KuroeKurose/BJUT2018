@@ -10,20 +10,23 @@ class LFUExampleIO(assoc: Int) extends Bundle {
   val missResp = Valid(UInt(log2Ceil(assoc).W))
 }
 
-class LFUExample(setIndex: Int, assoc: Int) extends Module {
+class LFUExample(setIndex: Int, assoc: Int) extends Module with CurrentCycle {
   val io = IO(new LFUExampleIO(assoc))
 
   val lfu = new LFU(setIndex, assoc)
 
   io.missResp.valid := false.B
-  io.missResp.bits := DontCare
+  io.missResp.bits := 0.U
 
   when(io.hitReq.valid) {
     lfu.hit(io.hitReq.bits)
   }
 
   when(io.missReq.valid) {
+    io.missResp.valid := true.B
     io.missResp.bits := lfu.miss()
+
+    printf(p"[$currentCycle] cache.sets($setIndex).lfu.miss: victimWay = ${io.missResp.bits}\n")
   }
 }
 
@@ -35,13 +38,34 @@ class LFUExampleTester(example: LFUExample) extends PeekPokeTester(example) {
 
   step(1)
 
+  poke(example.io.hitReq.bits, 1)
+
+  step(1)
+
+  poke(example.io.hitReq.bits, 6)
+
+  step(1)
+
+  poke(example.io.hitReq.bits, 7)
+
+  step(1)
+
   poke(example.io.hitReq.valid, false)
 
   poke(example.io.missReq.valid, true)
 
+  //  while (peek(example.io.missResp.valid) == 0) {
+  //    step(1)
+  //  }
+
   expect(example.io.missResp.bits, 1)
 
   step(1)
+
+  poke(example.io.missReq.valid, false)
+
+  step(10)
+
 }
 
 object LFUExampleTester extends App {
