@@ -12,7 +12,7 @@ class StridePrefetcher extends Module with Params with CurrentCycle {
   val entries = Seq.fill(stridePrefetcherTableSize)(new StridePrefetcherEntry)
 
   entries.zipWithIndex.foreach { case (entry, i) =>
-    entry <> (io.request, io.response)
+
   }
 
   val found = WireInit(false.B)

@@ -3,51 +3,69 @@ package scale
 import chisel3._
 import chisel3.util._
 
-class StridePrefetcherEntry extends Params with CurrentCycle {
-  def <>(request: ValidIO[PrefetcherRequest], response: ValidIO[PrefetcherResponse]): Unit = {
-    val instructionTag = RegNext(request.bits.pc, 0.U)
+class StridePrefetcherEntry extends Module with Params with CurrentCycle {
+  val io = IO(new StridePrefetcherEntryIO)
 
-    val previousAddress = RegNext(request.bits.effectiveAddress, 0.U)
+  val instructionTag = RegNext(io.entryInput.pc, 0.U)
+  io.entryOutput.pc := instructionTag
 
-    val stride = RegNext(request.bits.effectiveAddress - previousAddress, 0.U)
+  val previousAddress = RegNext(io.entryInput.effectiveAddress, 0.U)
 
-    val correct = stride === RegNext(stride)
+  val stride = RegNext(io.entryInput.effectiveAddress - previousAddress, 0.U)
 
-    val sInitial :: sSteady :: sTransient :: sNoPrediction :: Nil = Enum(4)
-    val state = RegInit(sInitial)
+  val correct = stride === RegNext(stride)
 
-    response.valid := state === sSteady || state === sTransient
-    response.bits.prefetchTarget := request.bits.effectiveAddress + stride
+  val sInitial :: sSteady :: sTransient :: sNoPrediction :: Nil = Enum(4)
+  val state = RegInit(sInitial)
+  io.entryOutput.state := sInitial
 
-    switch(state) {
-      is(sInitial) {
-        when(correct) {
-          state := sSteady
-        }.otherwise {
-          state := sTransient
-        }
+  io.entryOutput.prefetchValid := false.B
+  io.entryOutput.prefetchTarget := 0.U
+
+
+  io.entryOutput.prefetchValid := state === sSteady || state === sTransient
+  io.entryOutput.prefetchTarget := io.entryInput.effectiveAddress + stride
+
+  switch(state) {
+    is(sInitial) {
+      when(correct) {
+        state := sSteady
+        io.entryOutput.prefetchValid := true.B
+      }.otherwise {
+        state := sTransient
+        io.entryOutput.prefetchValid := true.B
       }
-      is(sSteady) {
-        when(correct) {
-          //no action
-        }.otherwise {
-          state := sInitial
-        }
+    }
+    is(sSteady) {
+      when(correct) {
+        //no action
+        io.entryOutput.prefetchValid := true.B
+      }.otherwise {
+        state := sInitial
+        io.entryOutput.prefetchValid := false.B
       }
-      is(sTransient) {
-        when(correct) {
-          state := sSteady
-        }.otherwise {
-          state := sNoPrediction
-        }
+    }
+    is(sTransient) {
+      when(correct) {
+        state := sSteady
+        io.entryOutput.prefetchValid := true.B
+      }.otherwise {
+        state := sNoPrediction
+        io.entryOutput.prefetchValid := false.B
       }
-      is(sNoPrediction) {
-        when(correct) {
-          state := sTransient
-        }.otherwise {
-          //no action
-        }
+    }
+    is(sNoPrediction) {
+      when(correct) {
+        state := sTransient
+        io.entryOutput.prefetchValid := true.B
+      }.otherwise {
+        //no action
+        io.entryOutput.prefetchValid := false.B
       }
     }
   }
+}
+
+object StridePrefetcherEntry extends App {
+  Driver.execute(Array("-td", "source/"), () => new StridePrefetcherEntry)
 }
