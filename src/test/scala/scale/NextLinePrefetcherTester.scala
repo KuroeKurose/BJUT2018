@@ -9,18 +9,18 @@ class NextLinePrefetcherTester(prefetcher: NextLinePrefetcher) extends PeekPokeT
   poke(prefetcher.io.request.valid, false)
   poke(prefetcher.io.request.bits.read, false)
   poke(prefetcher.io.request.bits.hit, false)
-  poke(prefetcher.io.request.bits.addr, 0.U)
+  poke(prefetcher.io.request.bits.effectiveAddress, 0.U)
   step(1)
 
   for (i <- 0 until 5) {
     poke(prefetcher.io.request.valid, true)
     poke(prefetcher.io.request.bits.read, rnd.nextBoolean())
-    poke(prefetcher.io.request.bits.addr, i.U)
+    poke(prefetcher.io.request.bits.effectiveAddress, i.U)
 
     while (peek(prefetcher.io.response.valid) == 0) {
       step(1)
     }
-    addr = peek(prefetcher.io.response.bits.addr)
+    addr = peek(prefetcher.io.response.bits.prefetchTarget)
     step(1)
     poke(prefetcher.io.request.valid, false)
   }

@@ -36,4 +36,6 @@ trait Params {
     def GB = size << 30
   }
 
+  val stridePrefetcherTableSize = 32
+
 }
