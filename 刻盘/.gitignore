@@ -1,0 +1,7 @@
+.idea/
+test_run_dir/
+target/
+project/target/
+source/
+*.class
+*.log
