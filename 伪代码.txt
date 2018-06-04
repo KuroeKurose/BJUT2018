@@ -1,0 +1,45 @@
+if hit :
+  read hitblock
+  call LFU(hit) //update counter
+  send hitblock to CPU
+  else
+  victimID = LFU(miss)  //update counter
+  newBlock = {read from mem}
+  cacheBlocks(victimID) = newBlock
+  send newBlock to CPU
+
+def hit(hitWay) 
+  hitCounterValue = counter(hitWay).value
+  for each counter :
+    if counter.value <= hitCounterValue :
+	  counter.value++
+	else
+	  no action
+  counter(hitWay).value = 0
+
+def miss 
+  for each counter :
+    if counter.value > victimCounterValue :
+	  victimWay = counter.way
+	  victimCounterValue = counter.value
+	else 
+	  victimWay NO change
+	  victimCounterValue NO change
+	
+  for each counter :
+    if counter.way == victimWay :
+	  counter.value = 0
+	else
+	  counter.value++
+	  
+  return victimWay
+
+if CPU.request.valid == true :
+  response.valid = true
+  response. prefetchTarget = CPU.request. effectiveAddress + addrWidth
+  send response. prefetchTarget to cache
+
+def main(args: Array[String]): Uint = {
+  runPeekPokeTester(() => new MyModule()){
+    (a,b) => new Tests(a,b)}
+}
